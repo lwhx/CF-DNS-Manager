@@ -60,11 +60,13 @@
 
 - **GitHub OAuth** (推荐)
 
-| 变量名                 | 描述                              |
-| :--------------------- | :-------------------------------- |
-| `GITHUB_CLIENT_ID`     | GitHub OAuth App 的 Client ID     |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth App 的 Client Secret |
-| `ALLOWED_GITHUB_USER`  | 你的 GitHub 用户名                |
+| 变量名                 | 描述                                  |
+| :--------------------- | :------------------------------------ |
+| `GITHUB_CLIENT_ID`     | GitHub OAuth App 的 Client ID         |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth App 的 Client Secret     |
+| `ALLOWED_GITHUB_USER`  | 你的 GitHub 用户名                    |
+| `ALLOWED_GITHUB_USER1` | (可选) 允许登录的备用 GitHub 用户名 1 |
+| `ALLOWED_GITHUB_USER*` | (可选) 允许登录的备用 GitHub 用户名 * |
 
 - **密码登录** (可选)
 

@@ -63,7 +63,11 @@ export async function onRequestGet(context) {
     const userData = await userResponse.json();
 
     // 3. Authorization Check
-    if (!allowedUser || userData.login !== allowedUser) {
+    const allowedUsers = Object.keys(env)
+        .filter(k => k.startsWith('ALLOWED_GITHUB_USER'))
+        .map(k => env[k].toLowerCase());
+
+    if (!allowedUsers.includes(userData.login.toLowerCase())) {
         return new Response('Unauthorized user', { status: 403 });
     }
 
