@@ -9,6 +9,8 @@ const translations = {
         serverMode: '托管模式',
         clientMode: '本地模式',
         passwordLabel: '管理员密码',
+        passwordDisabled: '密码登录已禁用',
+        githubOnlyHint: '此服务器仅支持 GitHub 授权登录',
         passwordPlaceholder: '输入应用密码...',
         tokenLabel: 'Cloudflare API 令牌',
         tokenPlaceholder: '粘贴您的 API 令牌...',
@@ -151,10 +153,14 @@ const translations = {
         invalidToken: '无效的 API 令牌',
         tokenRequired: '请输入 API 令牌',
         verifyFailed: '令牌校验失败',
+        invalidHostname: '主机名格式无效，不能包含空格或特殊字符，且不能以 - 开头或结尾',
         githubLogin: '使用 GitHub 登录',
         or: '或',
     },
     en: {
+        passwordDisabled: 'Password login is disabled',
+        githubOnlyHint: 'This server only supports GitHub login',
+        invalidHostname: 'Invalid hostname. Cannot contain spaces or special characters, and cannot start or end with -',
         title: 'DNS Manager',
         subtitle: 'Manage your Cloudflare domains securely',
         serverMode: 'Server Mode',
@@ -353,7 +359,7 @@ const CustomSelect = ({ value, options, onChange, placeholder = "Select..." }) =
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
-    }, [wrapperRef]);
+    }, []);
 
     const handleSelect = (val) => {
         onChange({ target: { value: val } });
@@ -448,12 +454,11 @@ const Login = ({ onLogin, t, lang, onLangChange }) => {
                 throw new Error('Config failed');
             })
             .then(data => {
-                console.log('Auth Config:', data);
                 if (data && typeof data.passwordMode === 'boolean') {
                     setConfig(data);
                 }
             })
-            .catch(err => console.error('Config fetch error:', err));
+            .catch(() => { });
     }, []);
 
     // 辅助函数：生成 SHA-256 哈希
@@ -574,7 +579,7 @@ const Login = ({ onLogin, t, lang, onLangChange }) => {
                                 <Key size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-muted)' }} />
                                 <input
                                     type="password"
-                                    placeholder={config.passwordMode ? t('passwordPlaceholder') : '密码登录已禁用'}
+                                    placeholder={config.passwordMode ? t('passwordPlaceholder') : t('passwordDisabled')}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     style={{ paddingLeft: '38px', backgroundColor: config.passwordMode ? '' : '#f5f5f5', cursor: config.passwordMode ? '' : 'not-allowed' }}
@@ -583,7 +588,7 @@ const Login = ({ onLogin, t, lang, onLangChange }) => {
                                 />
                             </div>
                             <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
-                                {config.passwordMode ? t('serverHint') : '此服务器仅支持 GitHub 授权登录'}
+                                {config.passwordMode ? t('serverHint') : t('githubOnlyHint')}
                             </p>
                         </div>
                     ) : (
@@ -750,7 +755,9 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             const res = await fetch(`/api/zones/${zone.id}/dns_records`, { headers: getHeaders() });
             const data = await res.json();
             setRecords((data.result || []).sort((a, b) => new Date(b.modified_on) - new Date(a.modified_on)));
-        } catch (e) { }
+        } catch (e) {
+            showToast(t('errorOccurred'), 'error');
+        }
         setLoading(false);
     };
 
@@ -864,12 +871,28 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
 
     const handleSaaSSubmit = async (e) => {
         e.preventDefault();
+        const hostname = newSaaS.hostname.trim();
+
+        // Frontend validation: check hostname format before calling API
+        if (!hostname || hostname.length > 255) {
+            showToast(t('invalidHostname') || 'Invalid hostname', 'error');
+            return;
+        }
+        if (/[_~`!@#$%^*()=+{}[\]|\\;:'",<>/?]/.test(hostname) || /\s/.test(hostname)) {
+            showToast(t('invalidHostname') || 'Hostname contains invalid characters', 'error');
+            return;
+        }
+        if (hostname.startsWith('-') || hostname.endsWith('-')) {
+            showToast(t('invalidHostname') || 'Hostname cannot start or end with -', 'error');
+            return;
+        }
+
         const method = editingSaaS ? 'PATCH' : 'POST';
         const url = `/api/zones/${zone.id}/custom_hostnames${editingSaaS ? `?id=${editingSaaS.id}` : ''}`;
 
         // Prepare payload correctly
         const payload = {
-            hostname: newSaaS.hostname,
+            hostname,
             ssl: {
                 method: newSaaS.ssl.method,
                 type: newSaaS.ssl.type,
@@ -882,28 +905,30 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
         if (newSaaS.custom_origin_server && newSaaS.custom_origin_server.trim()) {
             const origin = newSaaS.custom_origin_server.trim();
             payload.custom_origin_server = origin;
-            // Usually we want SNI to match the origin server hostname when overriding
             payload.custom_origin_snihost = origin;
         } else if (editingSaaS) {
-            // Explicitly clear when editing and choice is back to default
             payload.custom_origin_server = null;
             payload.custom_origin_snihost = null;
         }
 
-        const res = await fetch(url, {
-            method,
-            headers: getHeaders(true),
-            body: JSON.stringify(payload)
-        });
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: getHeaders(true),
+                body: JSON.stringify(payload)
+            });
 
-        if (res.ok) {
-            setShowSaaSModal(false);
-            setEditingSaaS(null);
-            fetchHostnames();
-            showToast(editingSaaS ? t('updateSuccess') : t('addSuccess'));
-        } else {
-            const data = await res.json().catch(() => ({}));
-            showToast(data.message || t('errorOccurred'), 'error');
+            if (res.ok) {
+                setShowSaaSModal(false);
+                setEditingSaaS(null);
+                fetchHostnames();
+                showToast(editingSaaS ? t('updateSuccess') : t('addSuccess'));
+            } else {
+                const data = await res.json().catch(() => ({}));
+                showToast(data.errors?.[0]?.message || data.message || t('errorOccurred'), 'error');
+            }
+        } catch (err) {
+            showToast(t('errorOccurred'), 'error');
         }
     };
 
@@ -959,6 +984,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                 setRecords(prev => prev.map(r =>
                     r.id === record.id ? { ...r, proxied: originalStatus } : r
                 ));
+                const data = await res.json().catch(() => ({}));
                 const isFallbackError = data.errors?.some(e => e.code === 1040);
                 if (isFallbackError) {
                     showToast(t('fallbackError'), 'error');
@@ -974,6 +1000,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             setRecords(prev => prev.map(r =>
                 r.id === record.id ? { ...r, proxied: originalStatus } : r
             ));
+            showToast(t('errorOccurred'), 'error');
         }
     };
 
@@ -1005,6 +1032,7 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
             a.download = `dns_records_${zone.name}.txt`;
             document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
             showToast(t('exportSuccess'));
         } catch (e) {
@@ -2105,7 +2133,9 @@ const App = () => {
                     setSelectedZone(null);
                 }
             }
-        } catch (err) { }
+        } catch (err) {
+            showToast(t('errorOccurred'), 'error');
+        }
         setLoading(false);
     };
 
@@ -2159,7 +2189,7 @@ const App = () => {
                     finalCredentials.accounts = data.accounts || [];
                 }
             } catch (e) {
-                console.error("Failed to fetch accounts:", e);
+                // Silently fail - accounts will remain empty
             }
         }
 

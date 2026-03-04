@@ -20,7 +20,9 @@ export async function onRequestPost(context) {
     const serverPasswordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
     if (password === serverPasswordHash) {
-        const secret = new TextEncoder().encode(serverPassword);
+        // JWT secret must match middleware: prefer GITHUB_CLIENT_SECRET, fallback to APP_PASSWORD
+        const jwtSecret = env.GITHUB_CLIENT_SECRET || serverPassword;
+        const secret = new TextEncoder().encode(jwtSecret);
         const jwt = await new SignJWT({ admin: true })
             .setProtectedHeader({ alg: 'HS256' })
             .setIssuedAt()

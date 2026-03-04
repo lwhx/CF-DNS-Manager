@@ -20,11 +20,11 @@ export async function onRequest(context) {
     // Priority 2: Server Mode (JWT provided, using server's CF_API_TOKEN)
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.substring(7);
-        // Fallback to GITHUB_CLIENT_SECRET if APP_PASSWORD is not set
-        const serverSecret = env.APP_PASSWORD || env.GITHUB_CLIENT_SECRET;
+        // JWT secret: prefer GITHUB_CLIENT_SECRET, fallback to APP_PASSWORD when GitHub OAuth is not configured
+        const serverSecret = env.GITHUB_CLIENT_SECRET || env.APP_PASSWORD;
 
         if (!serverSecret) {
-            return new Response(JSON.stringify({ error: 'Server-side Managed Mode is not configured.' }), {
+            return new Response(JSON.stringify({ error: 'Server is not configured. Set APP_PASSWORD or GITHUB_CLIENT_SECRET.' }), {
                 status: 403,
                 headers: { 'Content-Type': 'application/json' }
             });

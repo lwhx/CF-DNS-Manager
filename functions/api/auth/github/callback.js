@@ -8,7 +8,13 @@ export async function onRequestGet(context) {
 
     // CSRF Protection: Verify state
     const cookieHeader = request.headers.get('Cookie') || '';
-    const cookies = Object.fromEntries(cookieHeader.split(';').map(c => c.trim().split('=')));
+    const cookies = Object.fromEntries(
+        cookieHeader.split(';').map(c => {
+            const trimmed = c.trim();
+            const idx = trimmed.indexOf('=');
+            return idx === -1 ? [trimmed, ''] : [trimmed.slice(0, idx), trimmed.slice(idx + 1)];
+        })
+    );
     const storedState = cookies['github_oauth_state'];
 
     if (!code || !state || state !== storedState) {
@@ -18,8 +24,8 @@ export async function onRequestGet(context) {
     const clientId = env.GITHUB_CLIENT_ID;
     const clientSecret = env.GITHUB_CLIENT_SECRET;
     const allowedUser = env.ALLOWED_GITHUB_USER;
-    // Use APP_PASSWORD if available, otherwise fallback to GitHub Client Secret for JWT signing
-    const serverSecret = env.APP_PASSWORD || env.GITHUB_CLIENT_SECRET;
+    // JWT secret: prefer GITHUB_CLIENT_SECRET, fallback to APP_PASSWORD when GitHub OAuth is not configured
+    const serverSecret = clientSecret || env.APP_PASSWORD;
 
     if (!clientId || !clientSecret || !serverSecret) {
         return new Response('GitHub OAuth or Server Secret not configured', { status: 500 });
