@@ -1258,11 +1258,11 @@ const ZoneDetail = ({ zone, zones, onSwitchZone, onRefreshZones, zonesLoading, a
                                         accept=".txt"
                                     />
                                     <button className="btn btn-outline" onClick={() => fileInputRef.current.click()} disabled={importLoading}>
-                                        <Upload size={16} className={importLoading ? 'spin' : ''} />
+                                        <Download size={16} className={importLoading ? 'spin' : ''} />
                                         <span className="btn-text">{t('import')}</span>
                                     </button>
                                     <button className="btn btn-outline" onClick={handleExport}>
-                                        <Download size={16} />
+                                        <Upload size={16} />
                                         <span className="btn-text">{t('export')}</span>
                                     </button>
                                 </>
